@@ -21,6 +21,7 @@ def page(browser, request):
         if message.type == "error":
             url = message.location.get("url", "")
             if url.endswith("/public/orders/FF-9999") and "404" in message.text: return
+            if getattr(page, "_allow_expected_network_errors", False) and url.endswith(("/orders", "/parts")) and "ERR_FAILED" in message.text: return
             errors.append(f"{message.text} ({url})")
     page.on("pageerror", on_page_error)
     page.on("console", on_console)
