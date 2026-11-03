@@ -1,102 +1,69 @@
 # FixFlow
 
-FixFlow is a small web app for a computer and laptop repair shop. It keeps repair orders, customer details, repair status, and spare parts in one place.
-
-This is a student project for a Web Frontend course. The goal is to build a working app step by step and keep the code easy to understand.
-
-## Main features
-- View, search, and filter repair orders
-- Add and edit repair orders
-- Change repair status and view its history
-- Add and edit spare parts
-- Let customers check a repair status by order number
+FixFlow is a repair-shop management app for repair orders, customer status lookup and spare-parts inventory.
 
 ## Stack
-- Frontend: HTML, CSS, and JavaScript modules
-- Backend: Python and FastAPI
-- API contract: OpenAPI in `openapi.yaml`
-- Database: SQLite with SQLAlchemy ORM
-- Tests: Node's built-in test runner, Pytest, and Playwright browser checks
+- Frontend: static HTML, CSS and JavaScript modules
+- Backend: Python 3.12, FastAPI and SQLAlchemy
+- Database: PostgreSQL 16 in Docker Compose; SQLite remains available for local development and backend unit tests
+- Migrations: Alembic
+- Tests: Node unit tests, Pytest backend/integration tests and Python Playwright E2E tests
+- Deployment: Dockerfile, Docker Compose, Render Blueprint, Railway Dockerfile configuration and optional Vercel static frontend
 
-## Run locally on a Mac or PC
+## Run the complete application
 
-For local development, run the backend and frontend in separate terminals.
+    cp .env.example .env
+    # Change POSTGRES_PASSWORD in .env before using anything beyond local demo data.
+    docker compose up --build
 
-Terminal 1 — backend:
+Open http://localhost:8000. API docs are at http://localhost:8000/docs. PostgreSQL data is stored in the named fixflow-db volume. docker compose down preserves it; docker compose down -v deletes it.
 
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python -m uvicorn main:app --reload --port 8000
-```
+## Local development with SQLite
 
-Terminal 2 — frontend (from the repository root):
+    cd backend
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -r requirements.txt
+    DATABASE_URL=sqlite:///./fixflow.db python -m uvicorn main:app --reload --port 8000
 
-```bash
-cd frontend
-python3 -m http.server 5173
-```
+The frontend can be served separately from frontend/ on port 5173. In this split-port setup, its API service calls the backend on port 8000. FastAPI serves the static frontend automatically in the Docker image.
 
-Open http://localhost:5173. In this local setup, the frontend calls the API at http://127.0.0.1:8000. To use sample data without the backend, open http://localhost:5173/?mock=1.
+## Migrate an existing SQLite database
 
-The API docs are at http://127.0.0.1:8000/docs. The default SQLite database file is created in the backend folder.
+Start PostgreSQL, then run the schema migration and data-copy script:
 
-## Run in GitHub Codespaces (no local installation)
+    cd backend
+    DATABASE_URL='postgresql://fixflow:YOUR_PASSWORD@localhost:5432/fixflow' alembic upgrade head
+    cd ..
+    python scripts/migrate_sqlite_to_postgres.py --source sqlite:///backend/fixflow.db --target 'postgresql://fixflow:YOUR_PASSWORD@localhost:5432/fixflow'
 
-Codespaces uses a different setup from local development: **FastAPI serves both the frontend and API on port 8000**, so the page and API share one origin. Port 5173 is not used by the Codespaces startup script.
+The script preserves primary keys and status-history ordering and skips rows already present, so rerunning it does not duplicate rows.
 
-1. Open the repository on GitHub.
-2. Click the green **Code** button and select **Codespaces**.
-3. Click **Create codespace on main**.
-4. Wait for the environment setup to finish.
-5. Open the forwarded port labelled **FixFlow App** (8000). If it did not open automatically, use the **Ports** tab and choose **Open in Browser** for port 8000.
+## Tests
 
-To update an existing Codespace and restart the app, run these commands in its terminal:
+Frontend unit tests:
 
-```bash
-git pull
-bash .devcontainer/start.sh
-```
+    cd frontend && npm test
 
-If Git reports local changes or a merge conflict, stop and review the message rather than resetting files. The Codespaces configuration forwards only port 8000. The port is private by default; do not make it public when using real customer data. This project uses fictional demo records.
+Backend tests (SQLite):
 
-## Run tests
+    python -m pip install -r backend/requirements.txt
+    cd backend && python -m pytest -q
 
-Frontend mock service tests:
+Compose integration and Playwright E2E tests (requires Docker):
 
-```bash
-cd frontend
-npm test
-```
+    python -m pip install -r integration/requirements.txt -r e2e/requirements.txt
+    python -m playwright install chromium
+    docker compose up --build -d
+    python -m pytest -q integration
+    E2E_BASE_URL=http://localhost:8000 python -m pytest -q e2e
+    # Run a second time to check repeatability against the same database.
+    E2E_BASE_URL=http://localhost:8000 python -m pytest -q e2e
 
-Backend API and OpenAPI tests:
+E2E tests use unique test records and run serially because order numbers are generated sequentially. Failed browser tests save screenshots and Playwright traces under test-results/.
 
-```bash
-cd backend
-python -m pip install -r requirements.txt
-python -m pytest -q
-```
+## CI and deployment
 
-Browser smoke tests use Playwright and open the frontend served by FastAPI on port 8000. Start the backend from the local setup above first; the separate frontend server on port 5173 is not needed for this test. Then, from the repository root in another terminal, run:
+GitHub Actions checks frontend, backend, Docker build, Compose integration and Playwright E2E tests on pull requests and pushes to main. See the Actions tab for actual run results. Deployment options and cost warnings are in deploy/README.md.
 
-```bash
-python -m pip install -r frontend/requirements-test.txt
-python -m playwright install chromium
-python frontend/tests/browser_smoke.py
-```
-
-GitHub Actions checks JavaScript syntax, mock service tests, browser flows against FastAPI and SQLite, backend/OpenAPI tests, and the Codespaces startup configuration. See the [latest workflow run](https://github.com/DelonCarnales/fixflow/actions) for the actual result.
-
-## Development stages
-1. Plan and write the docs.
-2. Build the frontend using mock data.
-3. Define the API in OpenAPI.
-4. Build the backend with temporary in-memory data.
-5. Replace the temporary store with SQLite using SQLAlchemy.
-6. Connect the frontend to the backend.
-7. Run the complete app and test the main flows.
-
-## Current status
-The repository contains project planning docs, the frontend, a mock service, an OpenAPI contract, and a FastAPI backend with SQLite/SQLAlchemy persistence. The frontend uses the real API by default and supports mock mode with `?mock=1`. Codespaces runs the interface and API together on port 8000; local development uses frontend port 5173 and backend port 8000.
+Cloud deployment is not performed automatically until the account owner supplies provider credentials and explicitly reviews billing. Do not enable paid AWS account features or deploy resources outside the account's free allowance.

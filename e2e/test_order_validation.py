@@ -1,0 +1,18 @@
+def test_empty_and_invalid_order_form_is_rejected(page, base_url):
+    page.goto(base_url, wait_until="networkidle")
+    before = len(page.request.get(base_url + "/orders").json())
+    page.get_by_role("button", name="New repair order").click()
+    dialog = page.get_by_role("dialog", name="New repair order")
+    dialog.get_by_role("button", name="Create order").click()
+    alert = dialog.get_by_role("alert")
+    assert "Customer name is required." in alert.inner_text()
+    assert "Device model is required." in alert.inner_text()
+    assert "Problem description is required." in alert.inner_text()
+    dialog.locator('input[name="customerName"]').fill("   ")
+    dialog.locator('input[name="deviceModel"]').fill("   ")
+    dialog.locator('textarea[name="problem"]').fill("   ")
+    dialog.locator('input[name="estimatedCost"]').fill("-1")
+    dialog.get_by_role("button", name="Create order").click()
+    assert "Customer name is required." in alert.inner_text()
+    assert "Estimated cost cannot be negative." in alert.inner_text()
+    assert len(page.request.get(base_url + "/orders").json()) == before

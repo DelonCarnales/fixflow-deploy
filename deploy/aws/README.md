@@ -1,0 +1,3 @@
+# AWS CloudFormation deployment status
+
+The AWS deployment is intentionally not automated or launched by CI. A production FastAPI + PostgreSQL deployment on AWS requires compute, network access, persistent storage and a database. Those resources can incur charges, and promotional credits do not guarantee that an account remains on the AWS Free plan. This repository therefore does not create an AWS stack or request AWS credentials. Before adding a CloudFormation template or running a stack, the account owner must confirm the exact AWS Free plan eligibility and resource coverage in the AWS console, then explicitly approve a cost-reviewed architecture. Do not switch the account to a Paid plan.

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/health", "destination": "https://YOUR-RENDER-SERVICE.onrender.com/health" },
+    { "source": "/orders", "destination": "https://YOUR-RENDER-SERVICE.onrender.com/orders" },
+    { "source": "/orders/:path*", "destination": "https://YOUR-RENDER-SERVICE.onrender.com/orders/:path*" },
+    { "source": "/parts", "destination": "https://YOUR-RENDER-SERVICE.onrender.com/parts" },
+    { "source": "/parts/:path*", "destination": "https://YOUR-RENDER-SERVICE.onrender.com/parts/:path*" },
+    { "source": "/public/:path*", "destination": "https://YOUR-RENDER-SERVICE.onrender.com/public/:path*" }
+  ]
+}
