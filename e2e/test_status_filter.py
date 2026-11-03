@@ -12,10 +12,12 @@ def test_status_filter_and_search_can_be_combined_and_cleared(page, base_url):
     assert page.get_by_text(received["id"], exact=True).count() == 0
     for row in page.locator("tr.clickable-row").all():
         assert row.locator("td").nth(4).inner_text() == "Diagnosing"
-    page.get_by_label("Search repair orders").fill(diagnosing["deviceModel"])
+    search = page.get_by_label("Search repair orders")
+    search.fill(diagnosing["deviceModel"])
     assert page.get_by_text(diagnosing["id"], exact=True).is_visible()
-    page.get_by_label("Search repair orders").fill("not-a-match")
+    search.fill("not-a-match")
     assert page.get_by_text("No repair orders match your search.", exact=True).is_visible()
+    search.fill("")
     select.select_option(label="All statuses")
     assert page.locator("tr.clickable-row").count() == len(page.request.get(base_url + "/orders").json())
 
