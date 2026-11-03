@@ -1,0 +1,48 @@
+# FixFlow with PostgreSQL. Start everything with:  docker compose up --build
+# The app is then available at http://localhost:8000
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fixflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fixflow}
+      POSTGRES_DB: ${POSTGRES_DB:-fixflow}
+    volumes:
+      - fixflow-db:/var/lib/postgresql/data
+    # Only this computer can reach the database; it is not exposed to the network.
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    mem_limit: 256m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fixflow}:${POSTGRES_PASSWORD:-fixflow}@db:5432/${POSTGRES_DB:-fixflow}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    mem_limit: 256m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  fixflow-db:

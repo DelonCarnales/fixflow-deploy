@@ -5,3 +5,6 @@ __pycache__/
 venv/
 backend/fixflow.db
 backend/*.db
+.env
+e2e-results/
+test-results/
