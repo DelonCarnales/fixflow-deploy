@@ -14,4 +14,4 @@ def test_search_filters_by_order_customer_and_device(page, base_url):
     search.fill(order["deviceModel"])
     assert page.get_by_text(order["id"], exact=True).is_visible()
     search.fill("no-such-order-e2e")
-    assert page.get_by_text("No repair orders found", exact=False).is_visible()
+    assert page.get_by_text("No repair orders match your search.", exact=True).is_visible()
