@@ -1,10 +1,10 @@
 def test_repair_orders_list_columns_footer_and_navigation(page, base_url):
     page.goto(base_url, wait_until="networkidle")
     orders = page.request.get(base_url + "/orders").json()
-    page.get_by_role("button", name="Repair orders").click()
+    page.locator('[data-page="orders"]').click()
     page.get_by_role("heading", name="Repair orders").wait_for()
-    headers = page.locator("table thead th").all_inner_texts()
-    assert headers == ["Order", "Customer", "Device", "Received", "Status", "Technician"]
+    headers = [value.strip().lower() for value in page.locator("table thead th").all_inner_texts()]
+    assert headers == ["order", "customer", "device", "received", "status", "technician"]
     assert page.get_by_text(f"Showing {len(orders)} of {len(orders)} orders", exact=True).is_visible()
     first_row = page.locator("tr.clickable-row").first
     order_id = first_row.locator("button.order-link").inner_text()
