@@ -1,0 +1,17 @@
+.git
+.github
+.devcontainer
+.venv
+.env
+docs
+e2e
+integration
+deploy
+scripts
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/*.db
+backend/tests
+frontend/tests
+**/*.test.js
