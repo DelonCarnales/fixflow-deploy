@@ -5,9 +5,12 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 
 def normalize_database_url(url: str) -> str:
-    # Some hosts (Render, Railway) give "postgres://...", but SQLAlchemy needs "postgresql://".
-    if url.startswith("postgres://"):
-        return "postgresql://" + url[len("postgres://"):]
+    # Hosts such as Render and Railway give "postgres://..." or "postgresql://...".
+    # SQLAlchemy needs "postgresql://" and may pick a different default driver depending on
+    # its version, so name the driver we install (psycopg2) explicitly.
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg2://" + url[len(prefix):]
     return url
 
 
