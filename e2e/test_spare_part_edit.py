@@ -1,7 +1,7 @@
 from e2e.helpers import create_part, unique_name
 
 
-def test_edit_spare_part_keeps_id_and_cancel_discards(page, base_url):
+def test_edit_spare_part_keeps_id_updates_values_and_cancel_discards(page, base_url):
     part = create_part(page, stock=1)
     page.goto(base_url, wait_until="networkidle")
     page.get_by_role("button", name="Spare parts").click()
@@ -16,6 +16,8 @@ def test_edit_spare_part_keeps_id_and_cancel_discards(page, base_url):
     dialog.get_by_role("button", name="Save part").click()
     updated = page.get_by_role("row").filter(has_text=changed)
     assert updated.locator("td").nth(1).inner_text() == part["id"]
+    assert updated.locator("td").nth(2).inner_text() == "8"
+    assert updated.locator("td").nth(3).inner_text() == "5,100 ₸"
     assert updated.get_by_text("In stock", exact=True).is_visible()
     updated.get_by_role("button", name="Edit").click()
     dialog = page.get_by_role("dialog", name="Edit spare part")
