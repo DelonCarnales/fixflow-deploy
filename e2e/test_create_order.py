@@ -2,7 +2,7 @@ from datetime import date
 from e2e.helpers import unique_name
 
 
-def test_create_order_through_form(page, base_url):
+def test_create_order_through_form_and_dashboard_counts(page, base_url):
     page.goto(base_url, wait_until="networkidle")
     page.get_by_role("button", name="New repair order").click()
     dialog = page.get_by_role("dialog", name="New repair order")
@@ -22,3 +22,7 @@ def test_create_order_through_form(page, base_url):
     assert page.locator(".history-item").count() == 1
     page.get_by_role("button", name="Repair orders").click()
     assert page.get_by_text(order_id, exact=True).is_visible()
+    page.get_by_role("button", name="Dashboard").click()
+    orders = page.request.get(base_url + "/orders").json()
+    active = sum(item["status"] not in ["Completed", "Cancelled"] for item in orders)
+    assert page.locator(".stat-card").filter(has_text="Active orders").locator(".stat-value").inner_text() == str(active)
