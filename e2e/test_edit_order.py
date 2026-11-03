@@ -21,3 +21,8 @@ def test_edit_order_keeps_id_and_does_not_add_history_for_text_edits(page, base_
     dialog.locator('input[name="customerName"]').fill("Discarded Name")
     dialog.get_by_role("button", name="Cancel").click()
     assert page.get_by_text(order["customerName"], exact=True).is_visible()
+    page.get_by_role("button", name="Edit order details").click()
+    dialog = page.get_by_role("dialog", name="Edit repair order")
+    dialog.locator('input[name="customerName"]').fill("Closed Dialog Name")
+    dialog.get_by_role("button", name="Close form").click()
+    assert page.get_by_text(order["customerName"], exact=True).is_visible()
