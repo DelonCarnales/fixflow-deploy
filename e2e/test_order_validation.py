@@ -1,9 +1,6 @@
-from e2e.helpers import create_order
-
-
 def test_empty_and_invalid_order_form_is_rejected(page, base_url):
-    before = len(page.request.get(base_url + "/orders").json())
     page.goto(base_url, wait_until="networkidle")
+    before = len(page.request.get(base_url + "/orders").json())
     page.get_by_role("button", name="New repair order").click()
     dialog = page.get_by_role("dialog", name="New repair order")
     dialog.get_by_role("button", name="Create order").click()
@@ -16,5 +13,6 @@ def test_empty_and_invalid_order_form_is_rejected(page, base_url):
     dialog.locator('textarea[name="problem"]').fill("   ")
     dialog.locator('input[name="estimatedCost"]').fill("-1")
     dialog.get_by_role("button", name="Create order").click()
+    assert "Customer name is required." in alert.inner_text()
     assert "Estimated cost cannot be negative." in alert.inner_text()
     assert len(page.request.get(base_url + "/orders").json()) == before
