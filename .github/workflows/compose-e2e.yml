@@ -35,10 +35,20 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://fixflow:fixflow@localhost:5432/fixflow
         run: python -m pytest -q integration
-      - name: Run Playwright E2E tests
+      - name: Restart the app and verify database-backed data remains available
+        run: |
+          docker compose restart app
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://localhost:8000/health; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://localhost:8000/orders | grep -q "FF-1001"
+      - name: Run Playwright E2E tests twice against the same database
         env:
           E2E_BASE_URL: http://localhost:8000
-        run: python -m pytest -q e2e
+        run: |
+          python -m pytest -q e2e
+          python -m pytest -q e2e
       - name: Upload browser screenshots and traces
         if: failure()
         uses: actions/upload-artifact@v4
