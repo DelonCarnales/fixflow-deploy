@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  frontend:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install browser test dependency
+        run: |
+          python -m pip install -r frontend/requirements-test.txt
+          python -m pip install -r backend/requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Validate Codespaces configuration
+        run: |
+          python -c "import json; json.load(open('.devcontainer/devcontainer.json'))"
+          bash -n .devcontainer/start.sh
+      - name: Check JavaScript syntax
+        run: |
+          node --check frontend/src/app.js
+          node --check frontend/src/services/service.js
+          node --check frontend/src/services/apiService.js
+          node --check frontend/src/services/apiBase.js
+          node --check frontend/src/services/apiBase.test.js
+          node --check frontend/src/services/mockService.js
+          node --check frontend/src/services/mockService.test.js
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm test
+      - name: Start backend server with SQLite
+        run: |
+          cd backend
+          DATABASE_URL=sqlite:///./ci.db python -m uvicorn main:app --host 127.0.0.1 --port 8000 > /tmp/fixflow-backend.log 2>&1 &
+          for attempt in $(seq 1 20); do
+            if curl --silent --fail http://127.0.0.1:8000/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/fixflow-backend.log
+          exit 1
+      - name: Run same-origin browser smoke tests
+        run: python frontend/tests/browser_smoke.py
+
+  backend:
+    name: Backend tests (SQLite and PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fixflow
+          POSTGRES_PASSWORD: fixflow
+          POSTGRES_DB: fixflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fixflow -d fixflow_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run backend and contract tests on SQLite
+        working-directory: backend
+        run: python -m pytest -q
+      - name: Run backend tests on PostgreSQL (including migrations)
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgresql://fixflow:fixflow@localhost:5432/fixflow_test
+        run: python -m pytest -q -rs
+
+  build:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Build the image
+        run: docker build -t fixflow:ci .
+      - name: Start the container with SQLite
+        run: docker run -d --name fixflow-smoke -p 8000:8000 fixflow:ci
+      - name: Wait for the health check
+        run: |
+          for attempt in $(seq 1 60); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' fixflow-smoke)
+            echo "health: $status"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs fixflow-smoke
+          exit 1
+      - name: Check the page, the API and the user
+        run: |
+          curl --fail --silent http://localhost:8000/health
+          curl --fail --silent http://localhost:8000/ | grep -q "FixFlow - Repair Desk"
+          curl --fail --silent http://localhost:8000/orders | grep -q "FF-1001"
+          test "$(docker exec fixflow-smoke id -u)" = "10001"
+      - name: Show container logs
+        if: always()
+        run: docker logs fixflow-smoke
