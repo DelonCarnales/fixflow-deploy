@@ -26,10 +26,9 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               branch: "main",
-              head_sha: sha,
               per_page: 100
             });
-            const matches = expected.map(name => runs.data.workflow_runs.find(run => run.name === name && run.status === "completed"));
+            const matches = expected.map(name => runs.data.workflow_runs.find(run => run.name === name && run.head_sha === sha && run.status === "completed"));
             const ready = matches.every(run => run && run.conclusion === "success");
             core.info(JSON.stringify(matches.map((run, index) => ({workflow: expected[index], conclusion: run?.conclusion ?? "not completed"}))));
             core.setOutput("ready", ready ? "true" : "false");
