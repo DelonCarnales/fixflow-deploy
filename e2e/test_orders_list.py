@@ -1,8 +1,16 @@
-def test_repair_orders_list_shows_orders_and_navigation(page, base_url):
+def test_repair_orders_list_columns_footer_and_navigation(page, base_url):
     page.goto(base_url, wait_until="networkidle")
+    orders = page.request.get(base_url + "/orders").json()
     page.get_by_role("button", name="Repair orders").click()
     page.get_by_role("heading", name="Repair orders").wait_for()
-    assert page.get_by_role("textbox", name="Search repair orders").is_visible()
-    assert page.get_by_text("FF-1001", exact=True).is_visible()
-    assert page.get_by_text("FF-1002", exact=True).is_visible()
-    assert page.get_by_text("MacBook Air M1", exact=True).is_visible()
+    headers = page.locator("table thead th").all_inner_texts()
+    assert headers == ["Order", "Customer", "Device", "Received", "Status", "Technician"]
+    assert page.get_by_text(f"Showing {len(orders)} of {len(orders)} orders", exact=True).is_visible()
+    first_row = page.locator("tr.clickable-row").first
+    order_id = first_row.locator("button.order-link").inner_text()
+    device = first_row.locator("td").nth(2).locator("strong").inner_text()
+    first_row.locator("button.order-link").click()
+    page.get_by_role("heading", name=device).wait_for()
+    page.get_by_role("button", name="Back to repair orders").click()
+    assert page.get_by_role("heading", name="Repair orders").is_visible()
+    assert page.get_by_text(order_id, exact=True).is_visible()
