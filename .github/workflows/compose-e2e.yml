@@ -43,6 +43,15 @@ jobs:
             sleep 2
           done
           curl --fail --silent http://localhost:8000/orders | grep -q "FF-1001"
+      - name: Recreate the Compose stack without deleting its database volume
+        run: |
+          docker compose down
+          docker compose up --build -d
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://localhost:8000/health; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://localhost:8000/orders | grep -q "FF-1001"
       - name: Run Playwright E2E tests twice against the same database
         env:
           E2E_BASE_URL: http://localhost:8000
