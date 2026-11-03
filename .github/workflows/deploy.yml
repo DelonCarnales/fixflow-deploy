@@ -1,0 +1,74 @@
+name: Deploy after all CI checks
+
+on:
+  workflow_run:
+    workflows: ["CI", "Compose integration and E2E"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  verify-all-checks:
+    if: github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - uses: actions/github-script@v7
+        id: check
+        with:
+          script: |
+            const sha = context.payload.workflow_run.head_sha;
+            const expected = ["CI", "Compose integration and E2E"];
+            const runs = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: "main",
+              head_sha: sha,
+              per_page: 100
+            });
+            const matches = expected.map(name => runs.data.workflow_runs.find(run => run.name === name && run.status === "completed"));
+            const ready = matches.every(run => run && run.conclusion === "success");
+            core.info(JSON.stringify(matches.map((run, index) => ({workflow: expected[index], conclusion: run?.conclusion ?? "not completed"}))));
+            core.setOutput("ready", ready ? "true" : "false");
+
+  deploy:
+    needs: verify-all-checks
+    if: needs.verify-all-checks.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deployment
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Deploy to Railway
+        if: ${{ secrets.RAILWAY_TOKEN != '' && secrets.RAILWAY_SERVICE_ID != '' }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || 'production' }}
+        run: |
+          npm install --global @railway/cli
+          railway up --ci --detach --service "$RAILWAY_SERVICE_ID" --environment "$RAILWAY_ENVIRONMENT"
+
+      - name: Deploy static frontend to Vercel
+        if: ${{ secrets.VERCEL_TOKEN != '' && secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: frontend
+        run: |
+          npm install --global vercel
+          vercel link --yes --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN"
+          vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+          vercel build --prod --token "$VERCEL_TOKEN"
+          vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN"
+
+      - name: Explain skipped provider deployments
+        if: always()
+        run: echo "Provider deployments run only when their account-specific GitHub secrets are configured. AWS deployment remains manual pending explicit free-account and cost review."
