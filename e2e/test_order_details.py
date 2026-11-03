@@ -11,4 +11,4 @@ def test_order_details_show_all_repair_information(page, base_url):
         assert page.get_by_text(value, exact=True).is_visible()
     assert page.get_by_text("12,500 ₸", exact=True).is_visible()
     assert page.get_by_text("Received", exact=True).first.is_visible()
-    assert page.get_by_text(order["receivedDate"], exact=False).is_visible()
+    assert page.locator(".detail-heading .page-subtitle").inner_text() == f"Received on {order[\"receivedDate\"]}"
