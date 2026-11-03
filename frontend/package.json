@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 5173",
-    "test": "node --test src/services/mockService.test.js"
+    "test": "node --test src/services/mockService.test.js src/services/apiBase.test.js"
   }
 }
