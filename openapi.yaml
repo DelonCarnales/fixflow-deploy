@@ -1,0 +1,334 @@
+openapi: 3.0.3
+info:
+  title: FixFlow API
+  version: 1.0.0
+  description: Simple API for managing repair orders and spare parts in a small repair shop.
+servers:
+  - url: http://127.0.0.1:8000
+paths:
+  /health:
+    get:
+      summary: Check that the backend is running
+      responses:
+        "200":
+          description: Backend is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /orders:
+    get:
+      summary: List repair orders
+      parameters:
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: status
+          required: false
+          schema:
+            $ref: "#/components/schemas/RepairStatus"
+      responses:
+        "200":
+          description: Matching repair orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RepairOrder"
+    post:
+      summary: Create a repair order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepairOrderInput"
+      responses:
+        "201":
+          description: Created repair order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairOrder"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /orders/{orderId}:
+    parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+        example: FF-1001
+    get:
+      summary: Get one repair order
+      responses:
+        "200":
+          description: Repair order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairOrder"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      summary: Update repair order details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepairOrderInput"
+      responses:
+        "200":
+          description: Updated repair order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairOrder"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /orders/{orderId}/status:
+    patch:
+      summary: Change repair status
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/RepairStatus"
+      responses:
+        "200":
+          description: Updated status and history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairOrder"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /parts:
+    get:
+      summary: List spare parts
+      responses:
+        "200":
+          description: Spare parts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SparePart"
+    post:
+      summary: Add a spare part
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SparePartInput"
+      responses:
+        "201":
+          description: Created spare part
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SparePart"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /parts/{partId}:
+    patch:
+      summary: Update a spare part
+      parameters:
+        - in: path
+          name: partId
+          required: true
+          schema:
+            type: string
+          example: PT-01
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SparePartInput"
+      responses:
+        "200":
+          description: Updated spare part
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SparePart"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /public/orders/{orderId}:
+    get:
+      summary: Get public repair status without private staff notes
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+          example: FF-1003
+      responses:
+        "200":
+          description: Public repair status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicOrderStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  responses:
+    NotFound:
+      description: The requested item does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Input data failed validation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                description: Validation message
+                oneOf:
+                  - type: string
+                  - type: array
+  schemas:
+    RepairStatus:
+      type: string
+      enum:
+        - Received
+        - Diagnosing
+        - Waiting for parts
+        - Repairing
+        - Ready for pickup
+        - Completed
+        - Cancelled
+    StatusHistoryEntry:
+      type: object
+      required: [status, date]
+      properties:
+        status:
+          $ref: "#/components/schemas/RepairStatus"
+        date:
+          type: string
+          example: "2026-10-21 09:15"
+    RepairOrderInput:
+      type: object
+      required: [customerName, deviceType, deviceModel, problem, receivedDate, status]
+      properties:
+        customerName:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+          default: ""
+        deviceType:
+          type: string
+          default: Laptop
+        deviceModel:
+          type: string
+          minLength: 1
+        problem:
+          type: string
+          minLength: 1
+        receivedDate:
+          type: string
+          format: date
+        status:
+          $ref: "#/components/schemas/RepairStatus"
+        technician:
+          type: string
+          default: ""
+        estimatedCost:
+          type: number
+          minimum: 0
+          nullable: true
+        notes:
+          type: string
+          default: ""
+    RepairOrder:
+      allOf:
+        - $ref: "#/components/schemas/RepairOrderInput"
+        - type: object
+          required: [id, history]
+          properties:
+            id:
+              type: string
+              example: FF-1001
+            history:
+              type: array
+              items:
+                $ref: "#/components/schemas/StatusHistoryEntry"
+    SparePartInput:
+      type: object
+      required: [name, stock, unitPrice]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        stock:
+          type: integer
+          minimum: 0
+        unitPrice:
+          type: number
+          minimum: 0
+    SparePart:
+      allOf:
+        - $ref: "#/components/schemas/SparePartInput"
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+              example: PT-01
+    PublicOrderStatus:
+      type: object
+      required: [id, deviceModel, receivedDate, status, message]
+      properties:
+        id:
+          type: string
+        deviceModel:
+          type: string
+        receivedDate:
+          type: string
+          format: date
+        status:
+          $ref: "#/components/schemas/RepairStatus"
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
