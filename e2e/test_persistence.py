@@ -1,5 +1,6 @@
 from e2e.helpers import unique_name
 
+
 def test_order_create_edit_status_and_part_survive_reload(page, base_url):
     customer, model = unique_name("PersistCustomer"), unique_name("PersistDevice")
     page.goto(base_url, wait_until="networkidle")
@@ -17,7 +18,8 @@ def test_order_create_edit_status_and_part_survive_reload(page, base_url):
     edit.locator('input[name="deviceModel"]').fill(changed_model)
     edit.get_by_role("button", name="Save changes").click()
     page.get_by_label("Repair status").select_option(label="Repairing")
-    page.get_by_role("button", name="Spare parts").click()
+    page.locator(".history-item").last.get_by_text("Repairing", exact=True).wait_for()
+    page.locator('[data-page="parts"]').click()
     part_name = unique_name("PersistedPart")
     page.get_by_role("button", name="Add part").click()
     part_dialog = page.get_by_role("dialog", name="Add spare part")
@@ -26,9 +28,9 @@ def test_order_create_edit_status_and_part_survive_reload(page, base_url):
     part_dialog.locator('input[name="unitPrice"]').fill("700")
     part_dialog.get_by_role("button", name="Add part").click()
     page.reload(wait_until="networkidle")
-    page.get_by_role("button", name="Repair orders").click()
-    page.locator(f'[data-open="{order_id}"]').click()
+    page.locator('[data-page="orders"]').click()
+    page.locator(f'button.order-link[data-open="{order_id}"]').click()
     assert page.get_by_role("heading", name=changed_model).is_visible()
     assert page.locator(".history-item").last.get_by_text("Repairing", exact=True).is_visible()
-    page.get_by_role("button", name="Spare parts").click()
+    page.locator('[data-page="parts"]').click()
     assert page.get_by_text(part_name, exact=True).is_visible()
