@@ -20,9 +20,9 @@ def test_create_order_through_form_and_dashboard_counts(page, base_url):
     assert page.get_by_text(customer, exact=True).is_visible()
     assert page.get_by_text("Received", exact=True).first.is_visible()
     assert page.locator(".history-item").count() == 1
-    page.get_by_role("button", name="Repair orders").click()
+    page.locator('[data-page="orders"]').click()
     assert page.get_by_text(order_id, exact=True).is_visible()
-    page.get_by_role("button", name="Dashboard").click()
+    page.locator('[data-page="dashboard"]').click()
     orders = page.request.get(base_url + "/orders").json()
     active = sum(item["status"] not in ["Completed", "Cancelled"] for item in orders)
     assert page.locator(".stat-card").filter(has_text="Active orders").locator(".stat-value").inner_text() == str(active)
