@@ -25,3 +25,14 @@ No AWS stack is launched by this repository or CI. A CloudFormation template tha
 ## CI/CD
 
 GitHub Actions runs frontend, backend, Docker build, Compose integration and Playwright E2E tests. Provider redeploy hooks require account-specific secrets and an explicit billing review; no cloud credentials or paid resources are created automatically.
+
+
+## GitHub Actions deployment secrets
+
+The optional deploy workflow is gated on successful completion of both CI workflows for the same commit on main. Configure only the providers you intend to use:
+
+- RENDER_DEPLOY_HOOK_URL: Render production deploy hook URL.
+- RAILWAY_TOKEN and RAILWAY_SERVICE_ID; optionally RAILWAY_ENVIRONMENT (defaults to production).
+- VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID for the frontend project.
+
+Before enabling Railway or Render, review each provider's current billing model and set usage limits. Vercel's rewrite destination in frontend/vercel.json must point to the actual backend host. Missing secrets cause that provider step to be skipped; AWS is deliberately excluded from automatic deployment until a Free-plan-compatible design is verified by the account owner.
