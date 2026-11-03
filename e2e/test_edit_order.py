@@ -4,8 +4,8 @@ from e2e.helpers import create_order, unique_name
 def test_edit_order_keeps_id_and_does_not_add_history_for_text_edits(page, base_url):
     order = create_order(page)
     page.goto(base_url, wait_until="networkidle")
-    page.get_by_role("button", name="Repair orders").click()
-    page.locator(f'[data-open="{order["id"]}"]').click()
+    page.locator('[data-page="orders"]').click()
+    page.locator(f'button.order-link[data-open="{order["id"]}"]').click()
     page.get_by_role("button", name="Edit order details").click()
     dialog = page.get_by_role("dialog", name="Edit repair order")
     assert dialog.locator('input[name="customerName"]').input_value() == order["customerName"]
