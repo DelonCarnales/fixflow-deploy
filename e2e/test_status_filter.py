@@ -10,7 +10,7 @@ def test_status_filter_and_search_can_be_combined(page, base_url):
     page.get_by_label("Search repair orders").fill(order["deviceModel"])
     assert page.get_by_text(order["id"], exact=True).is_visible()
     page.get_by_label("Search repair orders").fill("not-a-match")
-    assert page.get_by_text(order["id"], exact=True).count() == 0
+    assert page.get_by_text("No repair orders match your search.", exact=True).is_visible()
 
 
 def test_each_status_can_be_selected(page, base_url):
