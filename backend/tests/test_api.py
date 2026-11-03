@@ -1,19 +1,30 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from database import Base, get_db
+from database import Base, get_db, normalize_database_url
 from main import app, seed_data
+
+# Set TEST_DATABASE_URL (for example to a PostgreSQL address) to run these tests on another database.
+# Without it the tests use a temporary SQLite file.
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
 
 @pytest.fixture()
 def client(tmp_path):
-    test_engine = create_engine(
-        f"sqlite:///{tmp_path / 'test_fixflow.db'}",
-        connect_args={"check_same_thread": False},
-    )
+    if TEST_DATABASE_URL:
+        test_url = normalize_database_url(TEST_DATABASE_URL)
+        test_engine = create_engine(test_url)
+    else:
+        test_engine = create_engine(
+            f"sqlite:///{tmp_path / 'test_fixflow.db'}",
+            connect_args={"check_same_thread": False},
+        )
     TestingSessionLocal = sessionmaker(bind=test_engine, autocommit=False, autoflush=False)
+    Base.metadata.drop_all(bind=test_engine)  # start every test with empty tables
     Base.metadata.create_all(bind=test_engine)
 
     def override_get_db():
