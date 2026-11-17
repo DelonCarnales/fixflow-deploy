@@ -1,0 +1,25 @@
+# Import separately in Render to create an isolated Development stack.
+services:
+  - type: web
+    name: fixflow-web-dev
+    runtime: docker
+    plan: free
+    branch: development
+    autoDeploy: false
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: development
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fixflow-db-dev
+          property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: "1"
+databases:
+  - name: fixflow-db-dev
+    plan: free
+    databaseName: fixflow_dev
+    user: fixflow

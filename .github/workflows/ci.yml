@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -88,6 +88,9 @@ jobs:
       - name: Run backend and contract tests on SQLite
         working-directory: backend
         run: python -m pytest -q
+      - name: Test the on-call alert responder
+        working-directory: observability/oncall-agent
+        run: python -m pytest -q test_main.py
       - name: Run backend tests on PostgreSQL (including migrations)
         working-directory: backend
         env:
@@ -100,6 +103,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+      - name: Validate observability configuration
+        run: |
+          docker compose -f docker-compose.yml -f observability/docker-compose.yml config --quiet
+          python -m json.tool observability/grafana/dashboards/fixflow-overview.json > /dev/null
+          python -m compileall -q backend observability/oncall-agent
       - name: Build the image
         run: docker build -t fixflow:ci .
       - name: Start the container with SQLite

@@ -1,10 +1,14 @@
 from datetime import date, datetime
+import os
+import logging
+import time
 from enum import Enum
 from pathlib import Path
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import or_
@@ -12,6 +16,10 @@ from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine, get_db
 from models import Customer, Device, RepairOrder as RepairOrderRow, SparePart as SparePartRow, StatusHistory
+from observability import (prometheus_metrics, record_request, record_repair_order_created, record_repair_status_change, update_active_repair_orders, update_low_stock_parts)
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+logger = logging.getLogger(__name__)
 
 
 class RepairStatus(str, Enum):
@@ -180,6 +188,23 @@ def find_order(db: Session, order_id: str) -> RepairOrderRow:
 
 
 app = FastAPI(title="FixFlow API", version="1.0.0", description="A simple repair shop API.")
+FastAPIInstrumentor.instrument_app(app)
+
+
+@app.middleware("http")
+async def collect_application_metrics(request, call_next):
+    started = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        route = request.scope.get("route")
+        path = getattr(route, "path", request.url.path)
+        record_request(request.method, path, status_code, time.perf_counter() - started)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -196,6 +221,8 @@ def startup() -> None:
     db = SessionLocal()
     try:
         seed_data(db)
+        update_active_repair_orders(db.query(RepairOrderRow).filter(RepairOrderRow.status.notin_(["Completed", "Cancelled"])).count())
+        update_low_stock_parts(db.query(SparePartRow).filter(SparePartRow.stock <= 2).count())
     finally:
         db.close()
 
@@ -203,6 +230,20 @@ def startup() -> None:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics_endpoint() -> Response:
+    content, content_type = prometheus_metrics()
+    return Response(content=content, media_type=content_type)
+
+
+# A deliberately failing route is available only in the local observability demo stack.
+# It is disabled in normal Development and Production deployments.
+if os.getenv("ENABLE_DEMO_ENDPOINTS", "false").lower() == "true":
+    @app.get("/debug/500", include_in_schema=False)
+    def demo_server_error() -> None:
+        raise HTTPException(status_code=500, detail="Intentional observability demo error")
 
 
 @app.get("/orders", response_model=list[RepairOrder])
@@ -215,6 +256,8 @@ def list_repair_orders(search: str = Query(default=""), status_filter: Optional[
     if status_filter:
         query = query.filter(RepairOrderRow.status == status_filter.value)
     result = query.order_by(RepairOrderRow.received_date.desc(), RepairOrderRow.id.asc()).all()
+    active_count = db.query(RepairOrderRow).filter(RepairOrderRow.status.notin_(["Completed", "Cancelled"])).count()
+    update_active_repair_orders(active_count)
     return [order_to_dict(order) for order in result]
 
 
@@ -232,6 +275,7 @@ def create_repair_order(payload: RepairOrderInput, db: Session = Depends(get_db)
     db.add(order)
     db.commit()
     db.refresh(order)
+    record_repair_order_created()
     return order_to_dict(order)
 
 
@@ -257,6 +301,7 @@ def edit_repair_order(order_id: str, payload: RepairOrderInput, db: Session = De
     order.notes = data["notes"]
     if old_status != order.status:
         order.history.append(StatusHistory(status=order.status, changed_at=now_text()))
+        record_repair_status_change(old_status, order.status)
     db.commit()
     db.refresh(order)
     return order_to_dict(order)
@@ -265,8 +310,11 @@ def edit_repair_order(order_id: str, payload: RepairOrderInput, db: Session = De
 @app.patch("/orders/{order_id}/status", response_model=RepairOrder)
 def change_repair_status(order_id: str, payload: StatusChange, db: Session = Depends(get_db)) -> dict:
     order = find_order(db, order_id)
+    old_status = order.status
     order.status = payload.status.value
     order.history.append(StatusHistory(status=order.status, changed_at=now_text()))
+    if old_status != order.status:
+        record_repair_status_change(old_status, order.status)
     db.commit()
     db.refresh(order)
     return order_to_dict(order)
@@ -274,7 +322,9 @@ def change_repair_status(order_id: str, payload: StatusChange, db: Session = Dep
 
 @app.get("/parts", response_model=list[SparePart])
 def list_spare_parts(db: Session = Depends(get_db)) -> list[dict]:
-    return [part_to_dict(part) for part in db.query(SparePartRow).order_by(SparePartRow.id).all()]
+    parts = db.query(SparePartRow).order_by(SparePartRow.id).all()
+    update_low_stock_parts(sum(1 for part in parts if part.stock <= 2))
+    return [part_to_dict(part) for part in parts]
 
 
 @app.post("/parts", response_model=SparePart, status_code=status.HTTP_201_CREATED)
@@ -284,6 +334,7 @@ def create_spare_part(payload: SparePartInput, db: Session = Depends(get_db)) ->
     db.add(part)
     db.commit()
     db.refresh(part)
+    update_low_stock_parts(db.query(SparePartRow).filter(SparePartRow.stock <= 2).count())
     return part_to_dict(part)
 
 
@@ -298,6 +349,7 @@ def edit_spare_part(part_id: str, payload: SparePartInput, db: Session = Depends
     part.unit_price = data["unitPrice"]
     db.commit()
     db.refresh(part)
+    update_low_stock_parts(db.query(SparePartRow).filter(SparePartRow.stock <= 2).count())
     return part_to_dict(part)
 
 

@@ -2,7 +2,7 @@ name: Compose integration and E2E
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
