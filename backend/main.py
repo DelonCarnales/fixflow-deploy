@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import os
 import logging
 import time
 from enum import Enum
@@ -233,6 +234,14 @@ def health() -> dict:
 def metrics_endpoint() -> Response:
     content, content_type = prometheus_metrics()
     return Response(content=content, media_type=content_type)
+
+
+# A deliberately failing route is available only in the local observability demo stack.
+# It is disabled in normal Development and Production deployments.
+if os.getenv("ENABLE_DEMO_ENDPOINTS", "false").lower() == "true":
+    @app.get("/debug/500", include_in_schema=False)
+    def demo_server_error() -> None:
+        raise HTTPException(status_code=500, detail="Intentional observability demo error")
 
 
 @app.get("/orders", response_model=list[RepairOrder])
