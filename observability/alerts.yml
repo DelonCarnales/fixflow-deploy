@@ -31,3 +31,13 @@ groups:
         annotations:
           summary: "FixFlow API is not reachable"
           description: "Prometheus cannot scrape the FixFlow API metrics endpoint."
+
+      - alert: FixFlowLowInventory
+        expr: fixflow_low_stock_parts > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: fixflow
+        annotations:
+          summary: "FixFlow has spare parts at or below the low-stock threshold"
+          description: "One or more spare-part items have stock at or below two units."
