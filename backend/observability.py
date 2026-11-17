@@ -8,7 +8,7 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "fixflow-api")
 RESOURCE = Resource.create({
@@ -17,6 +17,10 @@ RESOURCE = Resource.create({
 })
 HTTP_REQUESTS = Counter("fixflow_http_requests_total", "Total HTTP requests handled by FixFlow", ["method", "path", "status"])
 HTTP_DURATION = Histogram("fixflow_http_request_duration_seconds", "HTTP request duration in seconds", ["method", "path"], buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10))
+REPAIR_ORDERS_CREATED = Counter("fixflow_repair_orders_created_total", "Repair orders created in FixFlow")
+REPAIR_STATUS_CHANGES = Counter("fixflow_repair_status_changes_total", "Repair order status changes", ["from_status", "to_status"])
+ACTIVE_REPAIR_ORDERS = Gauge("fixflow_active_repair_orders", "Current number of active repair orders")
+LOW_STOCK_PARTS = Gauge("fixflow_low_stock_parts", "Number of spare-part items with stock at or below two")
 
 endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").rstrip("/")
 trace_provider = TracerProvider(resource=RESOURCE)
@@ -58,3 +62,19 @@ def record_request(method: str, path: str, status: int, duration: float) -> None
 
 def prometheus_metrics() -> tuple[bytes, str]:
     return generate_latest(), CONTENT_TYPE_LATEST
+
+
+def record_repair_order_created() -> None:
+    REPAIR_ORDERS_CREATED.inc()
+
+
+def record_repair_status_change(old_status: str, new_status: str) -> None:
+    REPAIR_STATUS_CHANGES.labels(from_status=old_status, to_status=new_status).inc()
+
+
+def update_active_repair_orders(count: int) -> None:
+    ACTIVE_REPAIR_ORDERS.set(count)
+
+
+def update_low_stock_parts(count: int) -> None:
+    LOW_STOCK_PARTS.set(count)
