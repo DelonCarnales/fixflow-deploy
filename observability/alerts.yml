@@ -1,0 +1,33 @@
+groups:
+  - name: fixflow.application
+    rules:
+      - alert: FixFlowHighErrorRate
+        expr: |
+          (sum(rate(fixflow_http_requests_total{status=~"5.."}[5m])) /
+          clamp_min(sum(rate(fixflow_http_requests_total[5m])), 0.001)) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          service: fixflow
+        annotations:
+          summary: "FixFlow HTTP error rate is above 5%"
+          description: "More than 5% of FixFlow HTTP requests returned a 5xx response during the last five minutes."
+      - alert: FixFlowSlowResponses
+        expr: |
+          histogram_quantile(0.95, sum(rate(fixflow_http_request_duration_seconds_bucket[5m])) by (le)) > 1.5
+        for: 2m
+        labels:
+          severity: warning
+          service: fixflow
+        annotations:
+          summary: "FixFlow p95 response time is above 1.5 seconds"
+          description: "The 95th percentile request duration has exceeded 1.5 seconds."
+      - alert: FixFlowApiDown
+        expr: up{job="fixflow-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: fixflow
+        annotations:
+          summary: "FixFlow API is not reachable"
+          description: "Prometheus cannot scrape the FixFlow API metrics endpoint."
