@@ -88,6 +88,9 @@ jobs:
       - name: Run backend and contract tests on SQLite
         working-directory: backend
         run: python -m pytest -q
+      - name: Test the on-call alert responder
+        working-directory: observability/oncall-agent
+        run: python -m pytest -q test_main.py
       - name: Run backend tests on PostgreSQL (including migrations)
         working-directory: backend
         env:
