@@ -4,6 +4,7 @@ services:
   app:
     environment:
       APP_ENV: development
+      ENABLE_DEMO_ENDPOINTS: "true"
       OTEL_SERVICE_NAME: fixflow-api
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_RESOURCE_ATTRIBUTES: deployment.environment=development
