@@ -46,12 +46,19 @@ jobs:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: Trigger Render Development deployment
+      - name: Trigger Render Development deployment for this commit
         env:
-          RENDER_DEV_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEV_DEPLOY_HOOK_URL }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_DEV_SERVICE_ID: ${{ secrets.RENDER_DEV_SERVICE_ID }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
-          if [ -z "$RENDER_DEV_DEPLOY_HOOK_URL" ]; then
-            echo "::error::Add RENDER_DEV_DEPLOY_HOOK_URL to the development GitHub Environment."
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_DEV_SERVICE_ID" ]; then
+            echo "::error::Add RENDER_API_KEY and RENDER_DEV_SERVICE_ID to the development GitHub Environment."
             exit 1
           fi
-          curl --fail --silent --show-error --request POST "$RENDER_DEV_DEPLOY_HOOK_URL"
+          curl --fail --silent --show-error \
+            --request POST "https://api.render.com/v1/services/$RENDER_DEV_SERVICE_ID/deploys" \
+            --header "Authorization: Bearer $RENDER_API_KEY" \
+            --header "Accept: application/json" \
+            --header "Content-Type: application/json" \
+            --data "{\"commitId\":\"$COMMIT_SHA\",\"clearCache\":\"do_not_clear\"}"
