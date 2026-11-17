@@ -27,6 +27,8 @@ def fallback_analysis(payload: dict[str, Any]) -> str:
             advice = "Inspect p95 traces, database query duration, and resource saturation."
         elif name == "FixFlowApiDown":
             advice = "Check container health, application logs, database availability, and the /health endpoint."
+        elif name == "FixFlowLowInventory":
+            advice = "Review the spare-parts inventory in FixFlow and reorder or update stock for items at or below two units."
         else:
             advice = "Inspect the related Prometheus series, application logs, and traces before taking action."
         lines.append(f"{name}: {description}\nRecommended checks: {advice}")
@@ -39,6 +41,9 @@ def fetch_prometheus_context() -> dict[str, Any]:
         "request_rate_per_second": "sum(rate(fixflow_http_requests_total[5m]))",
         "server_error_rate": "sum(rate(fixflow_http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(fixflow_http_requests_total[5m])), 0.001)",
         "p95_response_seconds": "histogram_quantile(0.95, sum(rate(fixflow_http_request_duration_seconds_bucket[5m])) by (le))",
+        "active_repair_orders": "fixflow_active_repair_orders",
+        "low_stock_parts": "fixflow_low_stock_parts",
+        "orders_created_last_hour": "increase(fixflow_repair_orders_created_total[1h])",
     }
     snapshot: dict[str, Any] = {}
     for name, query in queries.items():
