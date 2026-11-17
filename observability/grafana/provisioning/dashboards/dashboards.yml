@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: FixFlow
+    orgId: 1
+    folder: FixFlow
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
