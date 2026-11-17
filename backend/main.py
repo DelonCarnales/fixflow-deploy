@@ -221,6 +221,8 @@ def startup() -> None:
     db = SessionLocal()
     try:
         seed_data(db)
+        update_active_repair_orders(db.query(RepairOrderRow).filter(RepairOrderRow.status.notin_(["Completed", "Cancelled"])).count())
+        update_low_stock_parts(db.query(SparePartRow).filter(SparePartRow.stock <= 2).count())
     finally:
         db.close()
 
