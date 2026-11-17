@@ -39,7 +39,7 @@ Alertmanager sends firing and resolved events to the on-call agent at `/alerts`.
 
 ## Demo an alert
 
-Generate 5xx responses by requesting a missing order repeatedly, or temporarily lower a threshold in `alerts.yml`. Wait for the configured `for` duration, then inspect Prometheus Alerts, Alertmanager, and the on-call agent logs:
+Generate 5xx responses by requesting `http://localhost:8000/debug/500` repeatedly. This endpoint is enabled only by the local observability Compose overlay and is not present in Production. Alternatively, temporarily lower a threshold in `alerts.yml`. Wait for the configured `for` duration, then inspect Prometheus Alerts, Alertmanager, and the on-call agent logs:
 
 ```bash
 docker compose -f docker-compose.yml -f observability/docker-compose.yml logs -f oncall-agent alertmanager
