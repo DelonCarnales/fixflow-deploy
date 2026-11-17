@@ -1,10 +1,13 @@
 from datetime import date, datetime
+import logging
+import time
 from enum import Enum
 from pathlib import Path
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import or_
@@ -12,6 +15,10 @@ from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine, get_db
 from models import Customer, Device, RepairOrder as RepairOrderRow, SparePart as SparePartRow, StatusHistory
+from observability import prometheus_metrics, record_request
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+logger = logging.getLogger(__name__)
 
 
 class RepairStatus(str, Enum):
@@ -180,6 +187,23 @@ def find_order(db: Session, order_id: str) -> RepairOrderRow:
 
 
 app = FastAPI(title="FixFlow API", version="1.0.0", description="A simple repair shop API.")
+FastAPIInstrumentor.instrument_app(app)
+
+
+@app.middleware("http")
+async def collect_application_metrics(request, call_next):
+    started = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        route = request.scope.get("route")
+        path = getattr(route, "path", request.url.path)
+        record_request(request.method, path, status_code, time.perf_counter() - started)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -203,6 +227,12 @@ def startup() -> None:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics_endpoint() -> Response:
+    content, content_type = prometheus_metrics()
+    return Response(content=content, media_type=content_type)
 
 
 @app.get("/orders", response_model=list[RepairOrder])
