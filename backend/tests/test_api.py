@@ -169,7 +169,15 @@ def test_codespaces_frontend_origin_is_allowed(client):
 
 def test_prometheus_metrics_endpoint_exposes_fixflow_application_metrics(client):
     client.get("/health")
+    client.get("/orders")
+    client.get("/parts")
+    client.post("/orders", json=valid_order())
+    client.patch("/orders/FF-1001/status", json={"status": "Repairing"})
     response = client.get("/metrics")
     assert response.status_code == 200
     assert "fixflow_http_requests_total" in response.text
     assert "fixflow_http_request_duration_seconds_bucket" in response.text
+    assert "fixflow_active_repair_orders" in response.text
+    assert "fixflow_low_stock_parts" in response.text
+    assert "fixflow_repair_orders_created_total" in response.text
+    assert "fixflow_repair_status_changes_total" in response.text
