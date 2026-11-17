@@ -5,7 +5,7 @@ services:
     runtime: docker
     plan: free
     branch: development
-    autoDeploy: true
+    autoDeploy: false
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health
