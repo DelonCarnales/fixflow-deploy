@@ -4,6 +4,7 @@ import logging
 import os
 from typing import Any
 from urllib.request import Request, urlopen
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request as FastAPIRequest
 
@@ -30,6 +31,25 @@ def fallback_analysis(payload: dict[str, Any]) -> str:
             advice = "Inspect the related Prometheus series, application logs, and traces before taking action."
         lines.append(f"{name}: {description}\nRecommended checks: {advice}")
     return "\n\n".join(lines)
+
+
+def fetch_prometheus_context() -> dict[str, Any]:
+    base = os.getenv("PROMETHEUS_URL", "http://prometheus:9090").rstrip("/")
+    queries = {
+        "request_rate_per_second": "sum(rate(fixflow_http_requests_total[5m]))",
+        "server_error_rate": "sum(rate(fixflow_http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(fixflow_http_requests_total[5m])), 0.001)",
+        "p95_response_seconds": "histogram_quantile(0.95, sum(rate(fixflow_http_request_duration_seconds_bucket[5m])) by (le))",
+    }
+    snapshot: dict[str, Any] = {}
+    for name, query in queries.items():
+        try:
+            url = f"{base}/api/v1/query?{urlencode({'query': query})}"
+            with urlopen(url, timeout=3) as response:
+                result = json.loads(response.read().decode("utf-8"))
+            snapshot[name] = result.get("data", {}).get("result", [])
+        except Exception as exc:
+            snapshot[name] = {"unavailable": str(exc)}
+    return snapshot
 
 
 def analyze_with_ai(payload: dict[str, Any]) -> tuple[str, bool]:
@@ -77,6 +97,7 @@ async def receive_alert(request: FastAPIRequest) -> dict[str, Any]:
         payload = await request.json()
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Expected an Alertmanager JSON payload") from exc
+    payload['telemetry_context'] = fetch_prometheus_context()
     analysis, ai_used = analyze_with_ai(payload)
     status = payload.get("status", "unknown")
     alert_names = [a.get("labels", {}).get("alertname", "Unknown") for a in payload.get("alerts", [])]
