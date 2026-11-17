@@ -1,15 +1,48 @@
 name: Deploy Development
 
 on:
-  push:
-    branches: [development]
+  workflow_run:
+    workflows: ["CI", "Compose integration and E2E"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
+  check-ci:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.head_branch == 'development'
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - name: Verify both test workflows for this commit
+        if: github.event_name == 'workflow_run'
+        uses: actions/github-script@v7
+        id: check
+        with:
+          script: |
+            const sha = context.payload.workflow_run.head_sha;
+            const expected = ["CI", "Compose integration and E2E"];
+            const runs = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              branch: "development", per_page: 100
+            });
+            const matches = expected.map(name => runs.data.workflow_runs.find(run =>
+              run.name === name && run.head_sha === sha && run.status === "completed"
+            ));
+            const ready = matches.every(run => run && run.conclusion === "success");
+            core.info(JSON.stringify(matches.map((run, i) => ({
+              workflow: expected[i], conclusion: run?.conclusion ?? "not completed"
+            }))));
+            core.setOutput("ready", ready ? "true" : "false");
+      - name: Allow explicit manual development deployment
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "Manual Development deployment requested."
   deploy-development:
+    needs: check-ci
+    if: github.event_name == 'workflow_dispatch' || needs.check-ci.outputs.ready == 'true'
     runs-on: ubuntu-latest
     environment: development
     steps:
