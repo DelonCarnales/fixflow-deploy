@@ -46,6 +46,7 @@ if endpoint:
     logging.getLogger().addHandler(LoggingHandler(level=logging.INFO, logger_provider=logger_provider))
 
 logger = logging.getLogger("fixflow.observability")
+logger.setLevel(logging.INFO)
 
 def record_request(method: str, path: str, status: int, duration: float) -> None:
     HTTP_REQUESTS.labels(method=method, path=path, status=str(status)).inc()
