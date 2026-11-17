@@ -35,7 +35,7 @@ Prometheus evaluates:
 - p95 response time above 1.5 seconds for two minutes.
 - API target unavailable for one minute.
 
-Alertmanager sends firing and resolved events to the on-call agent at `/alerts`. With `OPENAI_API_KEY` configured, the agent uses the OpenAI API to summarize the incident and recommend safe diagnostics. Without a key it returns deterministic rule-based triage and clearly reports that an AI model was not used. Optionally set `SLACK_WEBHOOK_URL` to deliver incident reports to Slack. The agent does not execute production changes.
+Alertmanager sends firing and resolved events to the on-call agent at `/alerts`. With `OPENAI_API_KEY` configured, the agent uses the OpenAI API to summarize the incident and recommend safe diagnostics. It enriches the alert payload with live Prometheus request-rate, 5xx error-rate and p95-latency query results. Without a key it returns deterministic rule-based triage and clearly reports that an AI model was not used. Optionally set `SLACK_WEBHOOK_URL` to deliver incident reports to Slack. The agent does not execute production changes.
 
 ## Demo an alert
 
