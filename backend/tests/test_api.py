@@ -164,3 +164,12 @@ def test_codespaces_frontend_origin_is_allowed(client):
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == origin
     assert response.headers["access-control-allow-credentials"] == "true"
+
+
+
+def test_prometheus_metrics_endpoint_exposes_fixflow_application_metrics(client):
+    client.get("/health")
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert "fixflow_http_requests_total" in response.text
+    assert "fixflow_http_request_duration_seconds_bucket" in response.text
