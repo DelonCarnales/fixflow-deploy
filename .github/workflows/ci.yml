@@ -100,6 +100,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+      - name: Validate observability configuration
+        run: |
+          docker compose -f docker-compose.yml -f observability/docker-compose.yml config --quiet
+          python -m json.tool observability/grafana/dashboards/fixflow-overview.json > /dev/null
+          python -m compileall -q backend observability/oncall-agent
       - name: Build the image
         run: docker build -t fixflow:ci .
       - name: Start the container with SQLite
