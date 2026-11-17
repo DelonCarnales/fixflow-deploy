@@ -80,3 +80,16 @@ See [docs/devops-observability.md](docs/devops-observability.md) and [observabil
 - OpenTelemetry exports traces, metrics and logs to the Collector. Prometheus scrapes custom application metrics; Grafana has a provisioned dashboard; Alertmanager calls the on-call responder.
 
 The external Render environments and GitHub Environment secrets still need to be configured in the account dashboard. Follow the setup guide before triggering cloud deployments.
+
+
+## DevOps and observability assignment
+
+See [docs/devops-observability.md](docs/devops-observability.md) and [observability/README.md](observability/README.md).
+
+- `development` is a separate Git branch and has a separate Render Blueprint/database in `render.development.yaml`.
+- Production remains on the `main` branch and the existing Render Blueprint.
+- GitHub Actions runs CI and Compose E2E checks on both branches. Development deploys after both checks pass.
+- Production promotion is a manual workflow that deploys a selected development commit after CI verification.
+- OpenTelemetry exports traces, metrics and logs to the Collector. Prometheus scrapes custom application metrics; Grafana has a provisioned dashboard; Alertmanager calls the on-call responder.
+
+The external Render environments and GitHub Environment secrets still need to be configured in the account dashboard. Follow the setup guide before triggering cloud deployments.
