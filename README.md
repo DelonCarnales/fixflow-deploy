@@ -67,3 +67,16 @@ E2E tests use unique test records and run serially because order numbers are gen
 GitHub Actions checks frontend, backend, Docker build, Compose integration and Playwright E2E tests on pull requests and pushes to main. See the Actions tab for actual run results. Deployment options and cost warnings are in deploy/README.md.
 
 Cloud deployment is not performed automatically until the account owner supplies provider credentials and explicitly reviews billing. Do not enable paid AWS account features or deploy resources outside the account's free allowance.
+
+
+## DevOps and observability assignment
+
+See [docs/devops-observability.md](docs/devops-observability.md) and [observability/README.md](observability/README.md).
+
+- `development` is a separate Git branch and has a separate Render Blueprint/database in `render.development.yaml`.
+- Production remains on the `main` branch and the existing Render Blueprint.
+- GitHub Actions runs CI and Compose E2E checks on both branches. Development deploys after both checks pass.
+- Production promotion is a manual workflow that deploys a selected development commit after CI verification.
+- OpenTelemetry exports traces, metrics and logs to the Collector. Prometheus scrapes custom application metrics; Grafana has a provisioned dashboard; Alertmanager calls the on-call responder.
+
+The external Render environments and GitHub Environment secrets still need to be configured in the account dashboard. Follow the setup guide before triggering cloud deployments.
