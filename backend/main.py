@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine, get_db
 from models import Customer, Device, RepairOrder as RepairOrderRow, SparePart as SparePartRow, StatusHistory
-from observability import prometheus_metrics, record_request
+from observability import (prometheus_metrics, record_request, record_repair_order_created, record_repair_status_change, update_active_repair_orders, update_low_stock_parts)
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 logger = logging.getLogger(__name__)
@@ -254,6 +254,8 @@ def list_repair_orders(search: str = Query(default=""), status_filter: Optional[
     if status_filter:
         query = query.filter(RepairOrderRow.status == status_filter.value)
     result = query.order_by(RepairOrderRow.received_date.desc(), RepairOrderRow.id.asc()).all()
+    active_count = db.query(RepairOrderRow).filter(RepairOrderRow.status.notin_(["Completed", "Cancelled"])).count()
+    update_active_repair_orders(active_count)
     return [order_to_dict(order) for order in result]
 
 
@@ -271,6 +273,7 @@ def create_repair_order(payload: RepairOrderInput, db: Session = Depends(get_db)
     db.add(order)
     db.commit()
     db.refresh(order)
+    record_repair_order_created()
     return order_to_dict(order)
 
 
@@ -296,6 +299,7 @@ def edit_repair_order(order_id: str, payload: RepairOrderInput, db: Session = De
     order.notes = data["notes"]
     if old_status != order.status:
         order.history.append(StatusHistory(status=order.status, changed_at=now_text()))
+        record_repair_status_change(old_status, order.status)
     db.commit()
     db.refresh(order)
     return order_to_dict(order)
@@ -304,8 +308,11 @@ def edit_repair_order(order_id: str, payload: RepairOrderInput, db: Session = De
 @app.patch("/orders/{order_id}/status", response_model=RepairOrder)
 def change_repair_status(order_id: str, payload: StatusChange, db: Session = Depends(get_db)) -> dict:
     order = find_order(db, order_id)
+    old_status = order.status
     order.status = payload.status.value
     order.history.append(StatusHistory(status=order.status, changed_at=now_text()))
+    if old_status != order.status:
+        record_repair_status_change(old_status, order.status)
     db.commit()
     db.refresh(order)
     return order_to_dict(order)
@@ -313,7 +320,9 @@ def change_repair_status(order_id: str, payload: StatusChange, db: Session = Dep
 
 @app.get("/parts", response_model=list[SparePart])
 def list_spare_parts(db: Session = Depends(get_db)) -> list[dict]:
-    return [part_to_dict(part) for part in db.query(SparePartRow).order_by(SparePartRow.id).all()]
+    parts = db.query(SparePartRow).order_by(SparePartRow.id).all()
+    update_low_stock_parts(sum(1 for part in parts if part.stock <= 2))
+    return [part_to_dict(part) for part in parts]
 
 
 @app.post("/parts", response_model=SparePart, status_code=status.HTTP_201_CREATED)
@@ -323,6 +332,7 @@ def create_spare_part(payload: SparePartInput, db: Session = Depends(get_db)) ->
     db.add(part)
     db.commit()
     db.refresh(part)
+    update_low_stock_parts(db.query(SparePartRow).filter(SparePartRow.stock <= 2).count())
     return part_to_dict(part)
 
 
@@ -337,6 +347,7 @@ def edit_spare_part(part_id: str, payload: SparePartInput, db: Session = Depends
     part.unit_price = data["unitPrice"]
     db.commit()
     db.refresh(part)
+    update_low_stock_parts(db.query(SparePartRow).filter(SparePartRow.stock <= 2).count())
     return part_to_dict(part)
 
 
